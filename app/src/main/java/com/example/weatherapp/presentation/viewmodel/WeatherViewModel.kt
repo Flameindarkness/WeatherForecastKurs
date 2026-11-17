@@ -30,6 +30,10 @@ class WeatherViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<WeatherUiState>(WeatherUiState.Initial)
     val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
     
+    // Соответствие «введённое название -> название города из API».
+    // Нужно, чтобы удалять город по карточке, где показано имя из API
+    private val cityNameByQuery = mutableMapOf<String, String>()
+
     // Список прогнозов для каждого города
     private val _forecasts = MutableStateFlow<List<WeatherForecast>>(emptyList())
     val forecasts: StateFlow<List<WeatherForecast>> = _forecasts.asStateFlow()
@@ -63,18 +67,21 @@ class WeatherViewModel @Inject constructor(
     
     /**
      * Удалить город из списка
-     * @param cityName Название города
+     * @param forecast Прогноз, карточку которого удаляет пользователь
      */
-    fun removeCity(cityName: String) {
-        _cities.update { it.filter { it != cityName } }
-        _forecasts.update { it.filter { it.city.name != cityName } }
-        
+    fun removeCity(forecast: WeatherForecast) {
+        val cityName = forecast.city.name
+        val queries = cityNameByQuery.filterValues { it == cityName }.keys
+        _cities.update { list -> list.filter { it !in queries } }
+        queries.forEach { cityNameByQuery.remove(it) }
+        _forecasts.update { list -> list.filter { it.city.name != cityName } }
+
         // Если список пуст, возвращаемся к начальному состоянию
         if (_cities.value.isEmpty()) {
             _uiState.update { WeatherUiState.Initial }
         }
     }
-    
+
     /**
      * Загрузить прогноз погоды для города
      * @param cityName Название города
@@ -91,7 +98,8 @@ class WeatherViewModel @Inject constructor(
             
             // Обрабатываем результат
             if (result.isSuccess) {
-                val forecast = result.getOrNull()!!
+                val forecast = result.getOrThrow()
+                cityNameByQuery[cityName] = forecast.city.name
                 // Обновляем список прогнозов
                 _forecasts.update { currentForecasts ->
                     // Удаляем старый прогноз для этого города, если он есть
@@ -108,8 +116,11 @@ class WeatherViewModel @Inject constructor(
                     WeatherUiState.Error(error.message ?: "Неизвестная ошибка")
                 }
                 
-                // Удаляем город из списка, если не удалось загрузить прогноз
-                _cities.update { it.filter { it != cityName } }
+                // Новый город, для которого не удалось получить прогноз, убираем из списка.
+                // Уже загруженный город оставляем: при обновлении ошибка может быть временной
+                if (cityName !in cityNameByQuery) {
+                    _cities.update { list -> list.filter { it != cityName } }
+                }
             }
         }
     }

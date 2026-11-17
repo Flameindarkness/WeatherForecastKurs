@@ -6,12 +6,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -24,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.weatherapp.presentation.ui.component.ErrorCard
 import com.example.weatherapp.presentation.ui.component.WeatherForecastCard
 import com.example.weatherapp.presentation.ui.state.WeatherUiState
 import com.example.weatherapp.presentation.viewmodel.WeatherViewModel
@@ -99,19 +99,18 @@ fun WeatherScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Отображение состояния
-            // Используем локальную переменную state, чтобы избежать проблем со smart cast
-            when (val state = uiState) {
-                is WeatherUiState.Initial -> {
-                    Text(
-                        text = "Добавьте город для просмотра прогноза погоды",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(32.dp)
-                    )
-                }
-                
-                is WeatherUiState.Loading -> {
+            // Ошибку показываем над списком, чтобы уже добавленные города не пропадали
+            val state = uiState
+            if (state is WeatherUiState.Error) {
+                ErrorCard(
+                    message = state.message,
+                    onRetry = { viewModel.refreshAll() }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            when {
+                state is WeatherUiState.Loading && forecasts.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -119,58 +118,32 @@ fun WeatherScreen(
                         CircularProgressIndicator()
                     }
                 }
-                
-                is WeatherUiState.Success -> {
-                    if (forecasts.isEmpty()) {
+
+                forecasts.isEmpty() -> {
+                    if (state !is WeatherUiState.Error) {
                         Text(
-                            text = "Прогнозы не найдены",
+                            text = "Добавьте город для просмотра прогноза погоды",
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(32.dp)
                         )
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(forecasts) { forecast ->
-                                WeatherForecastCard(
-                                    forecast = forecast,
-                                    onRemove = { viewModel.removeCity(forecast.city.name) }
-                                )
-                            }
-                        }
                     }
                 }
-                
-                is WeatherUiState.Error -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
+
+                else -> {
+                    if (state is WeatherUiState.Loading) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Ошибка",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                        items(forecasts) { forecast ->
+                            WeatherForecastCard(
+                                forecast = forecast,
+                                onRemove = { viewModel.removeCity(forecast) }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = state.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { 
-                                viewModel.refreshAll()
-                            }) {
-                                Text("Повторить")
-                            }
                         }
                     }
                 }

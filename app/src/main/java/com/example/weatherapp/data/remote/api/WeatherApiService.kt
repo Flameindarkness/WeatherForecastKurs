@@ -15,6 +15,7 @@ interface WeatherApiService {
      * @param longitude Долгота
      * @param hourly Параметры для почасового прогноза (temperature_2m)
      * @param forecastDays Количество дней прогноза (максимум 16)
+     * @param timezone Часовой пояс; "auto" — местное время города
      * @return WeatherForecastDto с прогнозом погоды
      */
     @GET("forecast")
@@ -22,7 +23,8 @@ interface WeatherApiService {
         @Query("latitude") latitude: Double,
         @Query("longitude") longitude: Double,
         @Query("hourly") hourly: String = "temperature_2m",
-        @Query("forecast_days") forecastDays: Int = 16
+        @Query("forecast_days") forecastDays: Int = 16,
+        @Query("timezone") timezone: String = "auto"
     ): WeatherForecastDto
 }
 
