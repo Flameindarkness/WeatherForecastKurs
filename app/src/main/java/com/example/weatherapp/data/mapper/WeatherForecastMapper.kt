@@ -29,8 +29,10 @@ object WeatherForecastMapper {
             throw IllegalArgumentException("Несоответствие размеров массивов времени и температуры")
         }
         
-        // Преобразуем списки времени и температуры в список HourlyWeather
-        val hourlyForecast = hourlyData.time.zip(hourlyData.temperature2m).map { (timeStr, temp) ->
+        // Преобразуем списки времени и температуры в список HourlyWeather.
+        // Часы без значения температуры (null) пропускаем
+        val hourlyForecast = hourlyData.time.zip(hourlyData.temperature2m).mapNotNull { (timeStr, temp) ->
+            if (temp == null) return@mapNotNull null
             try {
                 val dateTime = LocalDateTime.parse(timeStr, dateTimeFormatter)
                 HourlyWeather(
